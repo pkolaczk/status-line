@@ -1,0 +1,17 @@
+[package]
+authors = ["Piotr Kołaczkowski <pkolaczk@gmail.com>"]
+name = "status-line"
+description = "This crate allows you to display status & progress information in a terminal"
+categories = ["command-line-interface"]
+keywords = ["status", "progress", "progressbar", "terminal", "cli"]
+
+version = "0.1.0"
+edition = "2021"
+readme = "README.md"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi-escapes = "0.1.1"
+
