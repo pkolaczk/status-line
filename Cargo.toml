@@ -4,7 +4,7 @@ name = "status-line"
 description = "This crate allows you to display status & progress information in a terminal"
 categories = ["command-line-interface"]
 keywords = ["status", "progress", "progressbar", "terminal", "cli"]
-
+repository = "https://github.com/pkolaczk/status-line"
 version = "0.1.0"
 edition = "2021"
 readme = "README.md"
