@@ -1,11 +1,12 @@
 [package]
-authors = ["Piotr Kołaczkowski <pkolaczk@gmail.com>"]
 name = "status-line"
+version = "0.1.1"
 description = "This crate allows you to display status & progress information in a terminal"
+authors = ["Piotr Kołaczkowski <pkolaczk@gmail.com>"]
 categories = ["command-line-interface"]
 keywords = ["status", "progress", "progressbar", "terminal", "cli"]
+homepage = "https://github.com/pkolaczk/status-line"
 repository = "https://github.com/pkolaczk/status-line"
-version = "0.1.0"
 edition = "2021"
 readme = "README.md"
 license = "MIT"
