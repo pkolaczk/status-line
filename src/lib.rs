@@ -52,21 +52,27 @@ use std::time::Duration;
 
 use ansi_escapes::{CursorLeft, CursorPrevLine, EraseDown};
 
-fn redraw(state: &impl Display) {
+fn redraw(ansi: bool, state: &impl Display) {
     let stderr = std::io::stderr();
     let mut stderr = stderr.lock();
     let contents = format!("{}", state);
-    let line_count = contents.chars().filter(|c| *c == '\n').count();
-    write!(&mut stderr, "{}{}{}", EraseDown, state, CursorLeft).unwrap();
-    for _ in 0..line_count {
-        write!(&mut stderr, "{}", CursorPrevLine).unwrap();
+    if ansi {
+        let line_count = contents.chars().filter(|c| *c == '\n').count();
+        write!(&mut stderr, "{}{}{}", EraseDown, contents, CursorLeft).unwrap();
+        for _ in 0..line_count {
+            write!(&mut stderr, "{}", CursorPrevLine).unwrap();
+        }
+    } else {
+        writeln!(&mut stderr, "{}", contents).unwrap();
     }
 }
 
-fn clear() {
-    let stderr = std::io::stderr();
-    let mut stderr = stderr.lock();
-    write!(&mut stderr, "{}", EraseDown).unwrap();
+fn clear(ansi: bool) {
+    if ansi {
+        let stderr = std::io::stderr();
+        let mut stderr = stderr.lock();
+        write!(&mut stderr, "{}", EraseDown).unwrap();
+    }
 }
 
 struct State<D> {
@@ -86,19 +92,30 @@ impl<D> State<D> {
 /// Options controlling how to display the status line
 pub struct Options {
     /// How long to wait between subsequent refreshes of the status.
-    /// Defaults to 100 ms.
+    /// Defaults to 100 ms on interactive terminals (TTYs) and 1 s if the standard error
+    /// is not interactive, e.g. redirected to a file.
     pub refresh_period: Duration,
+
     /// Set it to false if you don't want to show the status on creation of the `StatusLine`.
     /// You can change the visibility of the `StatusLine` any time by calling
     /// [`StatusLine::set_visible`].
     pub initially_visible: bool,
+
+    /// Set to true to enable ANSI escape codes.
+    /// By default set to true if the standard error is a TTY.
+    /// If ANSI escape codes are disabled, the status line is not erased before each refresh,
+    /// it is printed in a new line instead.
+    pub enable_ansi_escapes: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
+        let is_tty = atty::is(atty::Stream::Stderr);
+        let refresh_period_ms = if is_tty { 100 } else { 1000 };
         Options {
-            refresh_period: Duration::from_millis(100),
+            refresh_period: Duration::from_millis(refresh_period_ms),
             initially_visible: true,
+            enable_ansi_escapes: is_tty,
         }
     }
 }
@@ -106,6 +123,7 @@ impl Default for Options {
 /// Wraps arbitrary data and displays it periodically on the screen.
 pub struct StatusLine<D: Display> {
     state: Arc<State<D>>,
+    options: Options,
 }
 
 impl<D: Display + Send + Sync + 'static> StatusLine<D> {
@@ -124,12 +142,12 @@ impl<D: Display + Send + Sync + 'static> StatusLine<D> {
         thread::spawn(move || {
             while Arc::strong_count(&state_ref) > 1 {
                 if state_ref.visible.load(Ordering::Acquire) {
-                    redraw(&state_ref.data);
+                    redraw(options.enable_ansi_escapes, &state_ref.data);
                 }
                 thread::sleep(options.refresh_period);
             }
         });
-        StatusLine { state }
+        StatusLine { state, options }
     }
 }
 
@@ -137,16 +155,16 @@ impl<D: Display> StatusLine<D> {
     /// Forces redrawing the status information immediately,
     /// without waiting for the next refresh cycle of the background refresh loop.
     pub fn refresh(&self) {
-        redraw(&self.state.data);
+        redraw(self.options.enable_ansi_escapes, &self.state.data);
     }
 
     /// Sets the visibility of the status line.
     pub fn set_visible(&self, visible: bool) {
         let was_visible = self.state.visible.swap(visible, Ordering::Release);
         if !visible && was_visible {
-            clear()
+            clear(self.options.enable_ansi_escapes)
         } else if visible && !was_visible {
-            redraw(&self.state.data)
+            redraw(self.options.enable_ansi_escapes, &self.state.data)
         }
     }
 
@@ -166,7 +184,7 @@ impl<D: Display> Deref for StatusLine<D> {
 impl<D: Display> Drop for StatusLine<D> {
     fn drop(&mut self) {
         if self.is_visible() {
-            clear()
+            clear(self.options.enable_ansi_escapes)
         }
     }
 }
